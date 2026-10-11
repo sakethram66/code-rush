@@ -1,0 +1,29 @@
+services:
+  code-rush:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persist the SQLite database (teams, questions, submissions, audit log) across restarts.
+      - coderush-data:/app/data
+    environment:
+      - PORT=3000
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
+      - TRUST_PROXY=${TRUST_PROXY:-false}
+      - BATCH_MINUTES=${BATCH_MINUTES:-25}
+      - JUDGE_CONCURRENCY=${JUDGE_CONCURRENCY:-4}
+    # For real contest use, keep a modest CPU/RAM cap so the judge queue stays responsive.
+    # Adjust these values to match the host machine.
+    cpus: 2.0
+    mem_limit: 4g
+    # Uncomment to let the judge fully isolate judged code from the network with `unshare --net`.
+    # Docker does not grant CAP_SYS_ADMIN by default; without it the judge still enforces CPU/memory
+    # limits and an unprivileged sandbox user, it just can't remove network access from judged code.
+    # cap_add:
+    #   - SYS_ADMIN
+    restart: unless-stopped
+
+volumes:
+  coderush-data:

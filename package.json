@@ -1,0 +1,22 @@
+{
+  "name": "code-rush",
+  "version": "1.0.0",
+  "description": "Code Rush - coding competition platform with admin-curated batches, sandboxed C/Java/Python judging and a combined leaderboard",
+  "main": "server/index.js",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "seed": "node server/seed.js",
+    "create-admin": "node scripts/create-admin.js",
+    "generate-seed": "python3 tools/generate_seed.py",
+    "test": "node --test --test-concurrency=1 --test-timeout=600000 \"tests/*.test.js\""
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.10.0",
+    "express": "^4.21.2"
+  }
+}
