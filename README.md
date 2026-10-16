@@ -4,9 +4,9 @@ A self-hosted coding-competition platform. An organiser curates a bank of Easy/M
 builds **batches** by hand-picking exactly **5 Easy + 10 Medium + 10 Hard** questions per batch, and
 starts the clock. Every team assigned to a batch sees the *same* 25 questions in the same fixed order
 (Easy 1–5, Medium 6–15, Hard 16–25) for the batch's duration (25 minutes by default). Code in C, Java or
-Python is compiled and judged in a sandboxed process. Scoring is flat: **10 points per solved question,
-250 max**, no partial credit, no hints, no penalties. A combined leaderboard ranks every team across
-every batch that has run.
+Python is compiled and judged in a sandboxed process. Solved questions award **2 points for Easy, 3 for
+Medium, and 5 for Hard** (90 points maximum per batch), with no partial credit, hints, or penalties.
+Organisers can view a combined leaderboard across batches; teams do not have leaderboard access.
 
 ## Features
 

@@ -3,7 +3,7 @@ const express = require('express');
 const { wrap, id, bad } = require('../util');
 
 module.exports = function teamRoutes(ctx) {
-  const { auth, contest, scoring } = ctx;
+  const { auth, contest } = ctx;
   const r = express.Router();
   r.use(auth.requireTeam);
 
@@ -27,12 +27,6 @@ module.exports = function teamRoutes(ctx) {
   r.get('/questions/:id/submissions', (req, res) => res.json(contest.submissions(req.auth.team, id(req.params.id))));
 
   r.get('/submissions/:id', (req, res) => res.json(contest.submission(req.auth.team, id(req.params.id), { withCode: req.query.code === '1' })));
-
-  r.get('/leaderboard', (req, res) => {
-    const rows = scoring.leaderboard();
-    const mine = req.auth.team.id;
-    res.json({ rows: rows.map(({ members, ...rest }) => ({ ...rest, me: rest.team_id === mine })) });
-  });
 
   return r;
 };

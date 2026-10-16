@@ -8,7 +8,7 @@
 - **Auth**: scrypt password hashes; opaque session tokens (sha-256 stored), HttpOnly+SameSite=Strict cookie; JSON-only mutations + Origin check (CSRF); login rate-limit.
 - **Timer**: batch-wide. `started_at` / `ends_at` stored in DB (epoch ms). Server is authoritative; a 1s scheduler completes expired batches; submissions rejected once `now > ends_at`. Survives restarts.
 - **Question lock**: DB triggers reject any change to `batch_questions` when batch is not `draft`, and reject `draft→running` unless the set is exactly 5 easy / 10 medium / 10 hard. App layer validates first with friendly messages.
-- **Scoring**: 10 pts per solved question (accepted = all tests passed, submitted before `ends_at`). Max 250. Ranking: score desc → time of last accepted solve (relative to batch start) asc. No penalties/hints.
+- **Scoring**: Easy = 2 pts, Medium = 3 pts, Hard = 5 pts (accepted = all tests passed, submitted before `ends_at`). Max 90 per batch. Ranking: score desc → time of last accepted solve (relative to batch start) asc. No penalties/hints; participant leaderboard access is disabled.
 - **Judge**: C (gcc), Java (javac or `java -m jdk.compiler`), Python 3. Runs with `prlimit` (cpu/as/nproc/fsize), process-group kill on timeout, output cap, unprivileged uid when server runs as root. Bounded in-process queue; queued/judging submissions re-enqueued on restart.
 - **Seed data**: `tools/generate_seed.py` (reference solutions produce expected outputs) → `seed/questions.json` (50 problems: 10 easy / 20 medium / 20 hard).
 

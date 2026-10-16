@@ -10,7 +10,7 @@ export async function renderLeaderboard(root, { session }) {
     el('h1', {}, 'Leaderboard'),
     !session.role ? el('a', { href: '#/login', class: 'btn btn-sm' }, 'Log in') : null,
   ]));
-  wrap.appendChild(el('p', {}, 'Combined ranking across every batch. Score = 10 points per solved question, out of 250.'));
+  wrap.appendChild(el('p', {}, 'Combined ranking across every batch. Easy = 2 points, Medium = 3 points, Hard = 5 points; 90 points maximum per batch.'));
 
   const box = el('div', { class: 'panel' });
   wrap.appendChild(box);

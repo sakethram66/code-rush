@@ -49,7 +49,6 @@ const ADMIN_NAV = [
 ];
 const TEAM_NAV = [
   ['/team', 'Dashboard'],
-  ['/leaderboard', 'Leaderboard'],
 ];
 
 function buildSidebar(role) {
@@ -135,8 +134,8 @@ route('/', async () => {
 });
 
 route('/leaderboard', async (root) => {
-  if (!session.role) { showLoginScreen(); renderLeaderboard(root === viewEl ? loginScreenEl : root, { session }); return; }
-  showAppShell(session.role);
+  if (session.role !== 'admin') { navigate(session.role === 'team' ? '/team' : '/login'); return; }
+  showAppShell('admin');
   return renderLeaderboard(root, { session });
 });
 

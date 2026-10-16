@@ -96,7 +96,7 @@ test('DB trigger: teams cannot move into or out of a started batch', () => {
   assert.throws(() => db.prepare(`INSERT INTO teams (name, username, password_hash, batch_id, created_at) VALUES ('U','u','x',1,1)`).run(), /already started/);
 });
 
-test('leaderboard: 10 points per solve, ranked by score then time, ties share a rank', () => {
+test('leaderboard: difficulty-based points, ranked by score then time, ties share a rank', () => {
   const { db, ids } = seedDb();
   addAll(db, ids, 1, pick(ids));
   const mk = (n) => Number(db.prepare(`INSERT INTO teams (name, username, password_hash, batch_id, created_at) VALUES (?,?,'x',1,1)`).run(n, n).lastInsertRowid);
@@ -107,16 +107,16 @@ test('leaderboard: 10 points per solve, ranked by score then time, ties share a 
     db.prepare('INSERT INTO solves (team_id,question_id,batch_id,submission_id,solved_at) VALUES (?,?,1,?,?)').run(team, q, sid, at);
   };
   const q = pick(ids);
-  for (let i = 0; i < 25; i++) solve(a, q[i], 2000 + i);        // 250 points, last solve at +1024s..
-  for (let i = 0; i < 3; i++) solve(b, q[i], 61000);              // 30 pts, 60s
-  for (let i = 0; i < 3; i++) solve(c, q[i], 61000);              // 30 pts, 60s (tie with B)
-  for (let i = 0; i < 3; i++) solve(d, q[i], 31000);              // 30 pts, 30s (faster)
+  for (let i = 0; i < 25; i++) solve(a, q[i], 2000 + i);        // 90 points, last solve at +1024s..
+  for (let i = 0; i < 3; i++) solve(b, q[i], 61000);              // 6 pts, 60s
+  for (let i = 0; i < 3; i++) solve(c, q[i], 61000);              // 6 pts, 60s (tie with B)
+  for (let i = 0; i < 3; i++) solve(d, q[i], 31000);              // 6 pts, 30s (faster)
   const lb = makeScoring(db).leaderboard();
   const by = Object.fromEntries(lb.map((r) => [r.team, r]));
-  assert.equal(by.A.score, 250); assert.equal(by.A.solved, 25); assert.equal(by.A.rank, 1);
+  assert.equal(by.A.score, 90); assert.equal(by.A.max_score, 90); assert.equal(by.A.solved, 25); assert.equal(by.A.rank, 1);
   assert.equal(by.D.rank, 2);
   assert.equal(by.B.rank, 3); assert.equal(by.C.rank, 3);
-  assert.equal(by.E.score, 0); assert.equal(by.E.rank, 5); assert.equal(by.E.time, '—');
+  assert.equal(by.B.score, 6); assert.equal(by.E.score, 0); assert.equal(by.E.rank, 5); assert.equal(by.E.time, '—');
   assert.equal(by.D.time, '00:30');
   // a solve for a question outside the batch is rejected by the DB
   db.prepare(`INSERT INTO questions (title, difficulty, statement, created_at, updated_at) VALUES ('x','easy','s',1,1)`).run();

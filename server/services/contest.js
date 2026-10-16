@@ -1,7 +1,7 @@
 'use strict';
 const { HttpError, bad, forbidden, notFound, now, int } = require('../util');
 const { execute, LANGS } = require('../judge/judge');
-const { POINTS_PER_QUESTION, MAX_SCORE, QUESTIONS_PER_BATCH } = require('./scoring');
+const { POINTS_BY_DIFFICULTY, MAX_SCORE, QUESTIONS_PER_BATCH } = require('./scoring');
 
 function tooMany(msg) { return new HttpError(429, msg); }
 
@@ -59,7 +59,7 @@ function makeContest(db, batches, queue, config, audit) {
     const teamRow = db.prepare('SELECT disqualified FROM teams WHERE id = ?').get(team.id);
     const b = batchOf(team);
     const t = now();
-    const out = { server_now: t, team: { id: team.id, name: team.name, members: team.members }, max_score: MAX_SCORE, total_questions: QUESTIONS_PER_BATCH, points_per_question: POINTS_PER_QUESTION, disqualified: !!(teamRow && teamRow.disqualified) };
+    const out = { server_now: t, team: { id: team.id, name: team.name, members: team.members }, max_score: MAX_SCORE, total_questions: QUESTIONS_PER_BATCH, points_by_difficulty: POINTS_BY_DIFFICULTY, disqualified: !!(teamRow && teamRow.disqualified) };
     if (!b) return { ...out, phase: 'unassigned', batch: null };
     const batch = { id: b.id, number: b.number, status: b.status, duration_minutes: b.duration_minutes, started_at: b.started_at, ends_at: b.ends_at, finished_at: b.finished_at };
     if (b.status === 'draft') return { ...out, phase: 'waiting', batch };
@@ -69,14 +69,14 @@ function makeContest(db, batches, queue, config, audit) {
         (SELECT COUNT(*) FROM submissions s WHERE s.team_id = ? AND s.question_id = q.id) AS attempts
       FROM batch_questions bq JOIN questions q ON q.id = bq.question_id
       WHERE bq.batch_id = ? ORDER BY bq.position`).all(team.id, b.id)
-      .map((q) => ({ ...q, status: solved.has(q.id) ? 'solved' : (q.attempts ? 'attempted' : 'unsolved') }));
+      .map((q) => ({ ...q, points: POINTS_BY_DIFFICULTY[q.difficulty], status: solved.has(q.id) ? 'solved' : (q.attempts ? 'attempted' : 'unsolved') }));
     const groups = { easy: 0, medium: 0, hard: 0 };
     questions.forEach((q) => { groups[q.difficulty] += 1; });
     const phase = b.status === 'running' && t <= b.ends_at ? 'running' : (b.status === 'paused' ? 'paused' : 'finished');
     return {
       ...out, phase, batch,
       remaining_ms: b.status === 'running' ? Math.max(0, b.ends_at - t) : (b.status === 'paused' ? Math.max(0, Number(b.paused_remaining_ms || 0)) : 0),
-      solved: solved.size, score: solved.size * POINTS_PER_QUESTION,
+      solved: solved.size, score: questions.reduce((total, q) => total + (solved.has(q.id) ? q.points : 0), 0),
       counts: groups, questions,
       pending: db.prepare(`SELECT COUNT(*) n FROM submissions WHERE team_id = ? AND status IN ('queued','judging')`).get(team.id).n,
     };
@@ -94,7 +94,7 @@ function makeContest(db, batches, queue, config, audit) {
     const last = db.prepare('SELECT language FROM drafts WHERE team_id = ? AND question_id = ? ORDER BY updated_at DESC LIMIT 1').get(team.id, qid);
     const solved = !!db.prepare('SELECT 1 FROM solves WHERE team_id = ? AND question_id = ?').get(team.id, qid);
     return {
-      id: q.id, position: q.position, title: q.title, difficulty: q.bq_difficulty, topic: q.topic,
+      id: q.id, position: q.position, title: q.title, difficulty: q.bq_difficulty, points: POINTS_BY_DIFFICULTY[q.bq_difficulty], topic: q.topic,
       statement: q.statement, input_format: q.input_format, output_format: q.output_format, constraints: q.constraints_text,
       time_limit_ms: q.time_limit_ms, memory_limit_mb: q.memory_limit_mb, samples, drafts, last_language: last ? last.language : null,
       solved, submissions: submissions(team, qid),

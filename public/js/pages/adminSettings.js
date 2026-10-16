@@ -13,7 +13,7 @@ export async function renderAdminSettings(root) {
   } });
   root.appendChild(el('div', { class: 'panel' }, [
     el('h3', {}, 'Leaderboard visibility'),
-    el('label', { class: 'checkbox-row' }, [toggle, el('span', {}, 'Show the combined leaderboard to teams and the public')]),
+    el('label', { class: 'checkbox-row' }, [toggle, el('span', {}, 'Show the combined leaderboard to the public')]),
     el('p', { style: 'margin-top:8px' }, 'When turned off, only organisers can view the leaderboard.'),
   ]));
 

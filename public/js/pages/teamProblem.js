@@ -57,6 +57,7 @@ export async function renderTeamProblem(root, params) {
     el('h1', {}, `Q${q.position}. ${q.title}`),
     el('span', { class: `badge badge-${q.difficulty}` }, q.difficulty[0].toUpperCase() + q.difficulty.slice(1)),
   ]));
+  statement.appendChild(el('p', { class: 'muted' }, `Solving this ${q.difficulty} problem earns ${q.points} points.`));
   if (q.solved) statement.appendChild(el('div', { class: 'alert alert-success' }, 'You have already solved this question.'));
   statement.appendChild(el('p', { style: 'white-space:pre-wrap' }, q.statement));
   if (q.input_format) statement.appendChild(el('div', {}, [el('h4', {}, 'Input format'), el('p', { style: 'white-space:pre-wrap' }, q.input_format)]));
@@ -149,9 +150,9 @@ export async function renderTeamProblem(root, params) {
         const ok = s.status === 'accepted';
         submitResultBox.appendChild(el('div', { class: `alert ${ok ? 'alert-success' : 'alert-error'}` }, [
           el('strong', {}, SUBMISSION_LABELS[s.status] || s.status),
-          ok ? ' — question solved, +10 points.' : ` — ${s.passed_tests}/${s.total_tests} hidden tests passed.${s.message ? ' ' + s.message : ''}`,
+          ok ? ` — question solved, +${q.points} points.` : ` — ${s.passed_tests}/${s.total_tests} hidden tests passed.${s.message ? ' ' + s.message : ''}`,
         ]));
-        if (ok) { toast('Accepted! +10 points.', 'success'); q.solved = true; }
+        if (ok) { toast(`Accepted! +${q.points} points.`, 'success'); q.solved = true; }
         const fresh = await api.get(`/api/team/questions/${q.id}/submissions`);
         renderHistory(fresh);
       } catch (e) { clearInterval(submissionPoll); }

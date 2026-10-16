@@ -25,6 +25,7 @@ export async function renderTeamDashboard(root) {
     clear(root);
     root.appendChild(el('h1', {}, `Welcome, ${st.team.name}`));
     root.appendChild(el('p', {}, st.team.members.join(', ')));
+    root.appendChild(el('p', { class: 'muted' }, `Points per solved problem: Easy ${st.points_by_difficulty.easy} · Medium ${st.points_by_difficulty.medium} · Hard ${st.points_by_difficulty.hard}.`));
 
     if (st.phase === 'unassigned') {
       root.appendChild(el('div', { class: 'panel empty' }, 'You have not been assigned to a batch yet. Please check with the organiser.'));
@@ -53,7 +54,7 @@ export async function renderTeamDashboard(root) {
     root.appendChild(timerBar);
 
     if (st.phase === 'finished') {
-      root.appendChild(el('div', { class: 'alert alert-info' }, ['Time is up for this batch. ', el('a', { href: '#/leaderboard' }, 'View the leaderboard →')]));
+      root.appendChild(el('div', { class: 'alert alert-info' }, 'Time is up for this batch.'));
     }
 
     const grouped = { easy: [], medium: [], hard: [] };

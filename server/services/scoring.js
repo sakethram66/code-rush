@@ -1,17 +1,17 @@
 'use strict';
 const { formatDuration } = require('../util');
 
-const POINTS_PER_QUESTION = 10;
 const QUESTIONS_PER_BATCH = 25;
-const MAX_SCORE = POINTS_PER_QUESTION * QUESTIONS_PER_BATCH; // 250
 const REQUIRED = { easy: 5, medium: 10, hard: 10 };
+const POINTS_BY_DIFFICULTY = { easy: 2, medium: 3, hard: 5 };
+const MAX_SCORE = Object.entries(REQUIRED).reduce((total, [difficulty, count]) => total + count * POINTS_BY_DIFFICULTY[difficulty], 0);
 
 function makeScoring(db) {
   /**
    * Leaderboard rows for teams whose batch has started.
    * Ranking: score desc, then time of the last accepted solve (from batch start) asc.
    * Teams with identical score and time share a rank (1,2,2,4).
-   * No penalties, hints or bonuses exist: score = solved * 10.
+  * No penalties, hints or bonuses exist: score is the sum of solved-question weights.
    */
   function leaderboard({ batchId } = {}) {
     const args = [];
@@ -19,10 +19,17 @@ function makeScoring(db) {
     if (batchId) { where += ' AND b.id = ?'; args.push(batchId); }
     const rows = db.prepare(`
       SELECT t.id AS team_id, t.name AS team, t.members, b.id AS batch_id, b.number AS batch_number, b.status AS batch_status,
-             b.started_at, COUNT(s.question_id) AS solved, MAX(s.solved_at) AS last_solved
+                  b.started_at, COUNT(s.question_id) AS solved,
+                  COALESCE(SUM(CASE bq.difficulty
+               WHEN 'easy' THEN ${POINTS_BY_DIFFICULTY.easy}
+               WHEN 'medium' THEN ${POINTS_BY_DIFFICULTY.medium}
+               WHEN 'hard' THEN ${POINTS_BY_DIFFICULTY.hard}
+               ELSE 0 END), 0) AS score,
+                  MAX(s.solved_at) AS last_solved
       FROM teams t
       JOIN batches b ON b.id = t.batch_id
       LEFT JOIN solves s ON s.team_id = t.id
+                LEFT JOIN batch_questions bq ON bq.batch_id = s.batch_id AND bq.question_id = s.question_id
       WHERE ${where}
       GROUP BY t.id`).all(...args);
 
@@ -31,7 +38,7 @@ function makeScoring(db) {
       return {
         team_id: r.team_id, team: r.team, members: JSON.parse(r.members || '[]'),
         batch_id: r.batch_id, batch: r.batch_number, batch_status: r.batch_status,
-        solved: r.solved, score: r.solved * POINTS_PER_QUESTION, max_score: MAX_SCORE,
+        solved: r.solved, score: r.score, max_score: MAX_SCORE,
         time_ms: timeMs, time: timeMs === null ? '—' : formatDuration(timeMs),
       };
     });
@@ -47,11 +54,20 @@ function makeScoring(db) {
   }
 
   function teamScore(teamId) {
-    const r = db.prepare('SELECT COUNT(*) n, MAX(solved_at) last FROM solves WHERE team_id = ?').get(teamId);
-    return { solved: r.n, score: r.n * POINTS_PER_QUESTION, max_score: MAX_SCORE, last_solved_at: r.last };
+    const r = db.prepare(`SELECT COUNT(*) AS solved,
+        COALESCE(SUM(CASE bq.difficulty
+          WHEN 'easy' THEN ${POINTS_BY_DIFFICULTY.easy}
+          WHEN 'medium' THEN ${POINTS_BY_DIFFICULTY.medium}
+          WHEN 'hard' THEN ${POINTS_BY_DIFFICULTY.hard}
+          ELSE 0 END), 0) AS score,
+        MAX(s.solved_at) AS last_solved_at
+      FROM solves s
+      LEFT JOIN batch_questions bq ON bq.batch_id = s.batch_id AND bq.question_id = s.question_id
+      WHERE s.team_id = ?`).get(teamId);
+    return { solved: r.solved, score: r.score, max_score: MAX_SCORE, last_solved_at: r.last_solved_at };
   }
 
   return { leaderboard, teamScore };
 }
 
-module.exports = { makeScoring, POINTS_PER_QUESTION, QUESTIONS_PER_BATCH, MAX_SCORE, REQUIRED };
+module.exports = { makeScoring, POINTS_BY_DIFFICULTY, QUESTIONS_PER_BATCH, MAX_SCORE, REQUIRED };

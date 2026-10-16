@@ -180,6 +180,8 @@ test('team login and lobby before the batch starts', async () => {
   assert.equal(st.body.questions, undefined);
   assert.equal((await S.alpha.get(`/api/team/questions/${S.set1[0]}`)).status, 403);
   assert.equal((await S.alpha.get('/api/admin/overview')).status, 401); // team cannot use the admin API
+  assert.equal((await S.alpha.get('/api/team/leaderboard')).status, 404);
+  assert.equal((await S.alpha.get('/api/leaderboard')).status, 403);
   S.bravoC = S.srv.client();
   assert.equal((await S.bravoC.post('/api/auth/team/login', { username: S.bravo.username, password: S.bravo.password })).status, 200);
 });
@@ -232,7 +234,9 @@ test('every team receives the same 25 questions in the same fixed order (Easy 1-
   assert.deepEqual(a.questions.map((q) => q.difficulty), [...Array(5).fill('easy'), ...Array(10).fill('medium'), ...Array(10).fill('hard')]);
   assert.deepEqual(a.counts, { easy: 5, medium: 10, hard: 10 });
   assert.ok(a.remaining_ms > 24 * 60 * 1000 && a.remaining_ms <= 25 * 60 * 1000);
-  assert.equal(a.score, 0); assert.equal(a.max_score, 250);
+  assert.equal(a.score, 0); assert.equal(a.max_score, 90);
+  assert.deepEqual(a.points_by_difficulty, { easy: 2, medium: 3, hard: 5 });
+  assert.deepEqual(a.questions.map((q) => q.points), [...Array(5).fill(2), ...Array(10).fill(3), ...Array(10).fill(5)]);
   S.qs = a.questions;
 });
 
@@ -337,31 +341,32 @@ test('submissions: C, Java and Python are judged; wrong answers do not score and
   const okC = await submitAndWait(S.bravoC, sum.id, 'c', c);
   assert.equal(okC.status, 'accepted'); assert.equal(okC.passed_tests, okC.total_tests);
   st = (await S.bravoC.get('/api/team/state')).body;
-  assert.equal(st.score, 10); assert.equal(st.solved, 1);
+  assert.equal(st.score, 2); assert.equal(st.solved, 1);
+  assert.equal(st.questions.find((x) => x.id === sum.id).points, 2);
   assert.equal(st.questions.find((x) => x.id === sum.id).status, 'solved');
 
   // a second accepted answer never adds points for the same question
   const okJava = await submitAndWait(S.bravoC, sum.id, 'java', java);
   assert.equal(okJava.status, 'accepted');
-  assert.equal((await S.bravoC.get('/api/team/state')).body.score, 10);
+  assert.equal((await S.bravoC.get('/api/team/state')).body.score, 2);
 
   const leap = S.qs.find((x) => x.title === 'Leap Year');
   const py = await submitAndWait(S.bravoC, leap.id, 'python', REF['Leap Year']);
   assert.equal(py.status, 'accepted');
-  assert.equal((await S.bravoC.get('/api/team/state')).body.score, 20);
+  assert.equal((await S.bravoC.get('/api/team/state')).body.score, 4);
 
   // infinite loop -> time limit, and it still leaves the queue clean
   const tle = await submitAndWait(S.bravoC, S.qs.find((x) => x.title === 'Even or Odd').id, 'python', 'while True: pass');
   assert.equal(tle.status, 'time_limit');
 });
 
-test('Alpha solves all 25 questions (Python reference solutions) and reaches the maximum score of 250', async () => {
+test('Alpha solves all 25 questions (Python reference solutions) and reaches the maximum score of 90', async () => {
   for (const q of S.qs) {
     const res = await submitAndWait(S.alpha, q.id, 'python', REF[q.title]);
     assert.equal(res.status, 'accepted', `${q.title}: ${res.status} (${res.message || ''}) failed test ${res.failed_test}`);
   }
   const st = (await S.alpha.get('/api/team/state')).body;
-  assert.equal(st.score, 250); assert.equal(st.solved, 25);
+  assert.equal(st.score, 90); assert.equal(st.max_score, 90); assert.equal(st.solved, 25);
   assert.ok(st.questions.every((q) => q.status === 'solved'));
 });
 
@@ -371,9 +376,11 @@ test('leaderboard: combined ranking with rank, team, batch, solved, score, time'
   assert.equal(r.status, 200);
   assert.equal(r.body.rows.length, 2);
   assert.equal(r.body.rows[0].team, 'Alpha'); assert.equal(r.body.rows[0].rank, 1);
-  assert.equal(r.body.rows[0].score, 250); assert.equal(r.body.rows[0].batch, 1); assert.equal(r.body.rows[0].solved, 25);
+  assert.equal(r.body.rows[0].score, 90); assert.equal(r.body.rows[0].max_score, 90); assert.equal(r.body.max_score, 90); assert.equal(r.body.rows[0].batch, 1); assert.equal(r.body.rows[0].solved, 25);
   assert.match(r.body.rows[0].time, /^\d\d:\d\d$/);
-  assert.equal(r.body.rows[1].team, 'Bravo'); assert.equal(r.body.rows[1].rank, 2); assert.equal(r.body.rows[1].score, 20);
+  assert.equal(r.body.rows[1].team, 'Bravo'); assert.equal(r.body.rows[1].rank, 2); assert.equal(r.body.rows[1].score, 4);
+  assert.equal((await S.alpha.get('/api/team/leaderboard')).status, 404);
+  assert.equal((await S.alpha.get('/api/leaderboard')).status, 403);
   assert.equal(r.body.rows[0].members, undefined); assert.equal(r.body.rows[0].team_id, undefined);
   // organiser can hide it from the public and teams, but admin still sees it
   assert.equal((await S.admin.put('/api/admin/settings', { public_leaderboard: false })).status, 200);
@@ -382,7 +389,7 @@ test('leaderboard: combined ranking with rank, team, batch, solved, score, time'
   await S.admin.put('/api/admin/settings', { public_leaderboard: true });
   const csv = await S.admin.get('/api/admin/leaderboard.csv');
   assert.match(csv.text, /^Rank,Team,Batch,Solved,Score,Time/);
-  assert.match(csv.text, /Alpha,1,25,250/);
+  assert.match(csv.text, /Alpha,1,25,90/);
 });
 
 test('sandbox: judged code cannot read the database or reach the network', async () => {
